@@ -8,12 +8,14 @@ function zsh_history_check() {
 	fi
 	cat "$1" | while read -r line; do
 		LN=$(( $LN + 1 ))
-		if ( echo $line | grep '^: [0-9]*:[0-9]*;' > /dev/null ); then
-			local new_time="$(echo $line | cut -d':' -f2 | tr -d ' ')"
+		local epoch_match="$(echo "$line" | grep -o '^: [0-9]*:[0-9]*;')"
+		if [ -n "$epoch_match" ]; then
+			local new_time="${epoch_match:2}"
+			new_time="${new_time%:*}"
 			if [ "$new_time" -lt "$last_time" ]; then
 				echo "Note: time goes back for $(($last_time - $new_time))s in $LN"
 			fi
-			if [ "$last_time" -eq "0" ]; then
+			if [ "$last_time" -eq 0 ]; then
 				echo -n "History start at: "
 				date -d @"$new_time"
 			fi
