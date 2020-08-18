@@ -1,4 +1,4 @@
-function zsh_history_merge() {
+zsh_history_merge() {
 	echo "Remote history check"
 	if ! [ -f "$1" ]; then
 		echo "File not exist, creating"
@@ -13,21 +13,21 @@ function zsh_history_merge() {
 		echo "Cannot open target file for rw"
 		return 3
 	fi
-	echo "Passed\n"
+	printf "Passed\n\n"
 
 	echo "Generating tmp histfile"
 	tmphist="${XDG_CACHE_HOME-$HOME/.cache}/zsh_history_manager/tmp_history"
-	mkdir -p "$(dirname $tmphist)"
-	fc -n -t "%s" -D -l 0 > $tmphist
-	echo "Passed\n"
+	mkdir -p "$(dirname "$tmphist")"
+	fc -n -t "%s" -l 0 > "$tmphist"
+	printf "Passed\n\n"
 
 	echo "Matching sync-ed history"
-	LN="$(cat "$1" | grep -n "^$(cat "$tmphist" | head -1)$" | head -1 | grep -o '^[0-9]*')"
-	echo "target split: $LN/$(cat "$1" | wc -l)"
+	LN="$(grep -n "^$(head -1 "$tmphist")$" "$1" | head -1 | grep -o '^[0-9]*')"
+	echo "target split: $LN/$(wc -l <"$1")"
 	hist_ln=1 # LN of first new line in tmphist
 	if [ -n "$LN" ]; then
 		echo "Find record in $LN, matching remaining"
-		cat "$1" | tail +$LN | while true; do
+		while true; do
 			# order is important!
 			IFS= read -r line_target || break
 			IFS= read -r line_hist <&3 || ( echo "Early EOF of tmphist" && return 5 )
@@ -35,20 +35,20 @@ function zsh_history_merge() {
 				echo "Line mismatch in target file:$LN tmphist:"
 				return 6
 			fi
-			LN=$(( $LN + 1 ))
-			hist_ln=$(( $hist_ln + 1 ))
-		done 3<"$tmphist"
+			LN=$(( LN + 1 ))
+			hist_ln=$(( hist_ln + 1 ))
+		done <<<"$(tail +"$LN" "$1")" 3<"$tmphist"
 	else
 		echo "No record found"
 	fi
-	echo "local split: $hist_ln/$(cat "$tmphist" | wc -l)"
-	echo "Passed\n"
+	echo "local split: $hist_ln/$(wc -l < "$tmphist")"
+	printf "Passed\n\n"
 
 	echo "Joint date verification"
-	last_target="$(cat "$1" | tail -1 | grep -o "^[0-9]*")"
+	last_target="$(tail -1 "$1" | grep -o "^[0-9]*")"
 	if [ -n "$last_target" ]; then # If saved history exists
-		first_tmphist="$(cat "$tmphist" | sed -nE "${hist_ln}p" | grep -o "^[0-9]*")"
-		if [ -z $first_tmphist ]; then
+		first_tmphist="$(sed -nE "${hist_ln}p" "$tmphist" | grep -o "^[0-9]*")"
+		if [ -z "$first_tmphist" ]; then
 			echo "Nothing to append"
 			return 0
 		fi
@@ -61,12 +61,12 @@ function zsh_history_merge() {
 	else
 		echo "but skip"
 	fi
-	echo "Passed\n"
+	printf "Passed\n\n"
 
 	echo "Appending new history and cleaning"
 	wc -l "$1"
-	cat "$tmphist" | tail +$hist_ln >> "$1"
+	tail +"$hist_ln" "$tmphist" >> "$1"
 	wc -l "$1"
-	rm $tmphist
-	echo "Passed\n"
+	rm "$tmphist"
+	printf "Passed\n\n"
 }
