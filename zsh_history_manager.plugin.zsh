@@ -1,50 +1,4 @@
-function zsh_history_check() {
-	local last_time=0
-	local LN=0
-	local check_pass=0
-	if ! [ -r "$1" ]; then
-		echo "History file not readable!"
-		return 2
-	fi
-	cat "$1" | while read -r line; do
-		LN=$(( $LN + 1 ))
-		local epoch_match="$(echo "$line" | grep -o '^: [0-9]*:[0-9]*;')"
-		if [ -n "$epoch_match" ]; then
-			local new_time="${epoch_match:2}"
-			new_time="${new_time%:*}"
-			if [ "$new_time" -lt "$last_time" ]; then
-				echo "Note: time goes back for $(($last_time - $new_time))s in $LN"
-			fi
-			if [ "$last_time" -eq 0 ]; then
-				echo -n "History start at: "
-				date -d @"$new_time"
-			fi
-			last_time=$new_time
-		else
-			echo "EXTENDED_HISTORY format error in $LN"
-			check_pass=1
-		fi
-		if [ $#line -gt ${ZSH_HISTORY_MAXLEN-256} ]; then
-			echo "Length overflow in $LN"
-			check_pass=1
-		fi
-	done
-	if [ "$check_pass" -ne 1 ]; then
-		echo -n "History end at: "
-		date -d @"$last_time"
-	fi
-	last_time=$new_time
-	return check_pass
-}
-
 function zsh_history_merge() {
-	echo "Local history check"
-	if ! zsh_history_check "$HISTFILE"; then
-		echo "History check failed for local history, refuse to merge"
-		return 1
-	fi
-	echo "Passed\n"
-
 	echo "Remote history check"
 	if ! [ -f "$1" ]; then
 		echo "File not exist, creating"
@@ -54,11 +8,6 @@ function zsh_history_merge() {
 		else
 			echo "File created"
 		fi
-	else
-		if ! zsh_history_check "$1"; then
-			echo "History check failed for remote history, refuse to merge"
-			return 4
-		fi
 	fi
 	if ! [ -w "$1" ] || ! [ -r "$1" ]; then
 		echo "Cannot open target file for rw"
@@ -66,9 +15,58 @@ function zsh_history_merge() {
 	fi
 	echo "Passed\n"
 
-	echo "Merging"
-	echo -n "$(wc -l < "$1")"+"$(wc -l < "$HISTFILE")"=
-	cat "$HISTFILE" >> "$1"
-	sort -uo "$1" "$1"
-	echo "$(wc -l < "$1")"
+	echo "Generating tmp histfile"
+	tmphist="${XDG_CACHE_HOME-$HOME/.cache}/zsh_history_manager/tmp_history"
+	mkdir -p "$(dirname $tmphist)"
+	fc -n -t "%s" -D -l 0 > $tmphist
+	echo "Passed\n"
+
+	echo "Matching sync-ed history"
+	LN="$(cat "$1" | grep -n "^$(cat "$tmphist" | head -1)$" | head -1 | grep -o '^[0-9]*')"
+	echo "target split: $LN/$(cat "$1" | wc -l)"
+	hist_ln=1 # LN of first new line in tmphist
+	if [ -n "$LN" ]; then
+		echo "Find record in $LN, matching remaining"
+		cat "$1" | tail +$LN | while true; do
+			# order is important!
+			IFS= read -r line_target || break
+			IFS= read -r line_hist <&3 || ( echo "Early EOF of tmphist" && return 5 )
+			if [ "$line_hist" != "$line_target" ]; then
+				echo "Line mismatch in target file:$LN tmphist:"
+				return 6
+			fi
+			LN=$(( $LN + 1 ))
+			hist_ln=$(( $hist_ln + 1 ))
+		done 3<"$tmphist"
+	else
+		echo "No record found"
+	fi
+	echo "local split: $hist_ln/$(cat "$tmphist" | wc -l)"
+	echo "Passed\n"
+
+	echo "Joint date verification"
+	last_target="$(cat "$1" | tail -1 | grep -o "^[0-9]*")"
+	if [ -n "$last_target" ]; then # If saved history exists
+		first_tmphist="$(cat "$tmphist" | sed -nE "${hist_ln}p" | grep -o "^[0-9]*")"
+		if [ -z $first_tmphist ]; then
+			echo "Nothing to append"
+			return 0
+		fi
+		echo -E "$first_tmphist vs $last_target"
+		if [ "$first_tmphist" -lt "$last_target" ]; then
+			echo "Date check failed"
+			return 7
+		fi
+		echo "Success"
+	else
+		echo "but skip"
+	fi
+	echo "Passed\n"
+
+	echo "Appending new history and cleaning"
+	wc -l "$1"
+	cat "$tmphist" | tail +$hist_ln >> "$1"
+	wc -l "$1"
+	rm $tmphist
+	echo "Passed\n"
 }
