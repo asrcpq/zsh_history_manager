@@ -29,15 +29,31 @@ zsh_history_merge() {
 		echo "Find record in $LN, matching remaining"
 		while true; do
 			# order is important!
-			IFS= read -r line_target || break
-			IFS= read -r line_hist <&3 || ( echo "Early EOF of tmphist" && return 5 )
+			IFS= read -r line_target <&3 || break
+			IFS= read -r line_hist <&4 || ( echo "Early EOF of tmphist" && return 5 )
 			if [ "$line_hist" != "$line_target" ]; then
-				echo "Line mismatch in target file:$LN tmphist:"
-				return 6
+				echo "Line mismatch in target file:$LN tmphist:$hist_ln"
+				echo "Trying to match trailing lines"
+				for ln in {$LN..$(wc -l < "$1")}; do
+					match_ln="$(grep -n "$(sed -nE "${ln}p" "$1")" "$tmphist" | grep -o "^[0-9]*")"
+					if [ -n "$match_ln" ]; then
+						echo "$ln<-->$match_ln"
+					else
+						echo "$ln<-->FAILED..."
+						return 6
+					fi
+				done
+				echo "Proceed(y)?"
+				read -r yn
+				[ "$yn" != "y" ] && return 7
+				target_tmp="$XDG_CACHE_HOME/zsh/target_tmp"
+				head -"$(( LN - 1 ))" "$1" > "$target_tmp"
+				mv "$target_tmp" "$1"
+				break
 			fi
 			LN=$(( LN + 1 ))
 			hist_ln=$(( hist_ln + 1 ))
-		done <<<"$(tail +"$LN" "$1")" 3<"$tmphist"
+		done 3<<<"$(tail +"$LN" "$1")" 4<"$tmphist"
 	else
 		echo "No record found"
 	fi
