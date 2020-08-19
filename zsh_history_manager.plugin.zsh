@@ -59,7 +59,7 @@ zsh_history_merge() {
 				[ "$yn" != "y" ] && return 7
 				local target_tmp="$XDG_CACHE_HOME/zsh/target_tmp"
 				head -"$(( LN - 1 ))" "$1" > "$target_tmp"
-				mv "$target_tmp" "$1"
+				mv -f "$target_tmp" "$1"
 				break
 			fi
 			LN=$(( LN + 1 ))
@@ -84,7 +84,7 @@ zsh_history_merge() {
 		echo -E "$first_tmphist vs $last_target"
 		if [ "$first_tmphist" -lt "$last_target" ]; then
 			echo "Date check failed"
-			return 7
+			return 8
 		fi
 		echo "Success"
 	else
