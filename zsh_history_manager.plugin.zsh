@@ -41,7 +41,7 @@ zsh_history_merge() {
 				echo "Trying to match trailing lines"
 				local ln=$LN
 				trailing_match() {
-					match_ln="$(grep -n "$line_hist" "$tmphist" | grep -o "^[0-9]*" | tr '\n' ',')"
+					match_ln="$(grep -n "$line_target" "$tmphist" | grep -o "^[0-9]*" | tr '\n' ',')"
 					if [ -n "$match_ln" ]; then
 						echo "$ln<-->${match_ln%,}"
 					else
@@ -51,7 +51,7 @@ zsh_history_merge() {
 					ln=$(( ln + 1 ))
 				}
 				trailing_match || return 6
-				while IFS= read -r line_hist <&3; do
+				while IFS= read -r line_target <&3; do
 					trailing_match || return 6
 				done
 				echo "Proceed(y)?"
