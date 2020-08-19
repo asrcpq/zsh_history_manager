@@ -39,7 +39,7 @@ zsh_history_merge() {
 			if [ "$line_hist" != "$line_target" ]; then
 				echo "Line mismatch in target file:$LN tmphist:$hist_ln"
 				echo "Trying to match trailing lines"
-				local ln=$(( LN - 1 ))
+				local ln=$LN
 				trailing_match() {
 					match_ln="$(grep -n "$line_hist" "$tmphist" | grep -o "^[0-9]*" | tr '\n' ',')"
 					if [ -n "$match_ln" ]; then
