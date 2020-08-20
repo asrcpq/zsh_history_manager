@@ -1,3 +1,21 @@
+#!/bin/zsh
+set -e
+
+# only for fc formatted version! not for HISTFILE
+zsh_history_check() {
+	[ -r "$1" ] || ( echo "History file not readable!" && return 1 );
+	if [ "$(cut -f1 -d' ' "$1" \
+		| sort \
+		| uniq -c \
+		| sort -n \
+		| tail -1 \
+		| awk '{print $1}')" -gt 10 ]; then
+		echo "Risk of epoch rewrite/dirty history detected"
+		return 2
+	fi
+	return 0
+}
+
 zsh_history_merge() {
 	echo "Remote history check"
 	if ! [ -f "$1" ]; then
@@ -13,12 +31,16 @@ zsh_history_merge() {
 		echo "Cannot open target file for rw"
 		return 3
 	fi
+	zsh_history_check "$1"
+	[ "$?" = 0 ] || return 9
 	printf "Passed\n\n"
 
-	echo "Generating tmp histfile"
+	echo "Generating tmp histfile and check"
 	local tmphist="${XDG_CACHE_HOME-$HOME/.cache}/zsh_history_manager/tmp_history"
 	mkdir -p "$(dirname "$tmphist")"
 	fc -n -t "%s" -l 0 > "$tmphist"
+	zsh_history_check "$tmphist"
+	[ "$?" = 0 ] || return 10
 	printf "Passed\n\n"
 
 	echo "Matching sync-ed history"
