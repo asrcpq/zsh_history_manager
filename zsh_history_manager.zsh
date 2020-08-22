@@ -29,7 +29,7 @@ _zsh_history_merge() {
 		echo "Cannot open target file for rw"
 		return 3
 	fi
-	zsh_history_check "$1"
+	_zsh_history_check "$1"
 	[ "$?" = 0 ] || return 9
 	printf "Passed\n\n"
 
@@ -37,7 +37,7 @@ _zsh_history_merge() {
 	local tmphist="${XDG_CACHE_HOME-$HOME/.cache}/zsh_history_manager/tmp_history"
 	mkdir -p "$(dirname "$tmphist")"
 	fc -n -t "%s" -l 0 > "$tmphist"
-	zsh_history_check "$tmphist"
+	_zsh_history_check "$tmphist"
 	[ "$?" = 0 ] || return 10
 	printf "Passed\n\n"
 
