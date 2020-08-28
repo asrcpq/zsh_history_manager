@@ -8,7 +8,7 @@ _zsh_history_check() {
 		| sort -n \
 		| tail -1 \
 		| awk '{print $1}')" -gt 10 ]; then
-		echo "Risk of epoch rewrite/dirty history detected"
+		echo "History may be corrupted."
 		return 2
 	fi
 	return 0
