@@ -1,6 +1,5 @@
 # only for fc formatted version! not for HISTFILE
 _zsh_history_check() {
-	set -e
 	[ -r "$1" ] || ( echo "History file not readable!" && return 1 );
 	if [ "$(cut -f1 -d' ' "$1" \
 		| sort \
