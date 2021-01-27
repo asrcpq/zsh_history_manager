@@ -61,7 +61,7 @@ _zsh_history_merge() {
 				local ln=$LN
 				trailing_match() {
 					match_ln="$( \
-						grep -n "^$line_target$" "$tmphist" \
+						grep -nFx "$line_target" "$tmphist" \
 						| grep -o "^[0-9]*" \
 						| tr '\n' ',' \
 					)"
@@ -69,6 +69,7 @@ _zsh_history_merge() {
 						echo "$ln<-->${match_ln%,}"
 					else
 						echo "$ln<-->FAILED..."
+						echo "$line_target"
 						return 6
 					fi
 					ln=$(( ln + 1 ))
