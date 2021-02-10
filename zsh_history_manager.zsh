@@ -1,3 +1,6 @@
+# 210210: simplified, it will only append history entries after the timestamp
+# This might drop some history but will greatly accelarate the process
+
 # only for fc formatted version! not for HISTFILE
 _zsh_history_check() {
 	[ -r "$1" ] || ( echo "History file not readable!" && return 1 );
@@ -40,76 +43,18 @@ _zsh_history_merge() {
 	[ "$?" = 0 ] || return 10
 	printf "Passed\n\n"
 
-	echo "Matching sync-ed history"
-	local LN
-	LN="$(grep -n "^$(head -1 "$tmphist")$" "$1" | head -1 | grep -o '^[0-9]*')"
-	echo "target split: $LN/$(wc -l <"$1")"
-	local hist_ln=1 # LN of first new line in tmphist
-	local line_target
-	local line_hist
-	local yn
-	local match_ln
-	if [ -n "$LN" ]; then
-		echo "Find record in $LN, matching remaining"
-		while true; do
-			# order is important!
-			IFS= read -r line_target <&3 || break
-			IFS= read -r line_hist <&4 || ( echo "Early EOF of tmphist" && return 5 )
-			if [ "$line_hist" != "$line_target" ]; then
-				echo "Line mismatch in target file:$LN tmphist:$hist_ln"
-				echo "Trying to match trailing lines"
-				local ln=$LN
-				trailing_match() {
-					match_ln="$( \
-						grep -nFx "$line_target" "$tmphist" \
-						| grep -o "^[0-9]*" \
-						| tr '\n' ',' \
-					)"
-					if [ -n "$match_ln" ]; then
-						echo "$ln<-->${match_ln%,}"
-					else
-						echo "$ln<-->FAILED..."
-						echo "$line_target"
-						return 6
-					fi
-					ln=$(( ln + 1 ))
-				}
-				trailing_match || return 6
-				while IFS= read -r line_target <&3; do
-					trailing_match || return 6
-				done
-				echo "Proceed(y)?"
-				read -r yn
-				[ "$yn" != "y" ] && return 7
-				local target_tmp="$XDG_CACHE_HOME/zsh/target_tmp"
-				head -"$(( LN - 1 ))" "$1" > "$target_tmp"
-				mv -f "$target_tmp" "$1"
-				break
-			fi
-			LN=$(( LN + 1 ))
-			hist_ln=$(( hist_ln + 1 ))
-		done 3<<<"$(tail +"$LN" "$1")" 4<"$tmphist"
-	else
-		echo "No record found"
-	fi
-	echo "local split: $hist_ln/$(wc -l < "$tmphist")"
-	printf "Passed\n\n"
-
-	echo "Joint date verification"
+	echo "Date extraction"
 	local last_target
 	last_target="$(tail -1 "$1" | grep -o "^[0-9]*")"
+	local hist_ln=1
 	if [ -n "$last_target" ]; then # If saved history exists
-		local first_tmphist
-		first_tmphist="$(sed -nE "${hist_ln}p" "$tmphist" | grep -o "^[0-9]*")"
-		if [ -z "$first_tmphist" ]; then
-			echo "Nothing to append"
-			return 0
-		fi
-		echo -E "$first_tmphist vs $last_target"
-		if [ "$first_tmphist" -lt "$last_target" ]; then
-			echo "Date check failed"
-			return 8
-		fi
+		while read -r line; do
+			newdate="${line%%[[:space:]]*}"
+			if [[ "$newdate" -gt "last_target" ]]; then
+				break
+			fi
+			((++hist_ln))
+		done < "$tmphist"
 		echo "Success"
 	else
 		echo "but skip"
